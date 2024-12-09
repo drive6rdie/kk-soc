@@ -2,25 +2,26 @@ services:
   attacker:
     image: debian:latest
     networks:
-      - my-network
-    command: bash -c "apt update && apt full-upgrade -y && apt install -y dialog apt-utils hydra iputils-ping nmap -y && tail -f /dev/null"
+      my-network:
+        ipv4_address: 192.168.1.100
+    command: bash -c "apt update && apt install -y dialog apt-utils iputils-ping iproute2 hydra net-tools nmap && wget https://raw.githubusercontent.com/danielmiessler/SecLists/refs/heads/master/Passwords/richelieu-french-top20000.txt -O /root/wordlist.txt && tail -f /dev/null"
     tty: true
 
   target:
     image: debian:latest
     networks:
-      - my-network
-    command: bash -c "apt update && apt full-upgrade -y && apt install dialog apt-utils ssh -y && service ssh start && tail -f /dev/null"
+      my-network:
+        ipv4_address: 192.168.1.101
+    command: bash -c "apt update && apt install -y dialog apt-utils iputils-ping iproute2 curl gpg rsyslog fail2ban openssh-server logwatch && mkdir /var/cache/logwatch && sed -i '/imklog/s/^/#/' /etc/rsyslog.conf && rsyslogd && echo 'root:SecurePassword123' | chpasswd && sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && service ssh start && curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg && echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' | tee -a /etc/apt/sources.list.d/wazuh.list && apt update && WAZUH_MANAGER='192.168.1.10' apt install -y wazuh-agent && /var/ossec/bin/wazuh-control start && tail -f /dev/null"
     tty: true
-    ports:
-      - "2222:22"
 
   wazuh.manager:
     image: wazuh/wazuh-manager:4.9.2
     hostname: wazuh.manager
     restart: always
     networks:
-      - my-network
+      my-network:
+        ipv4_address: 192.168.1.10
     ulimits:
       memlock:
         soft: -1
@@ -65,7 +66,8 @@ services:
     hostname: wazuh.indexer
     restart: always
     networks:
-      - my-network
+      my-network:
+        ipv4_address: 192.168.1.11
     ports:
       - "9200:9200"
     environment:
@@ -92,7 +94,8 @@ services:
     hostname: wazuh.dashboard
     restart: always
     networks:
-      - my-network
+      my-network:
+        ipv4_address: 192.168.1.12
     ports:
       - 443:5601
     environment:
@@ -120,6 +123,9 @@ services:
 networks:
   my-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.1.0/24
 
 volumes:
   wazuh_api_configuration:
