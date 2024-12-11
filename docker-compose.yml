@@ -3,9 +3,6 @@ services:
     image: wazuh/wazuh-manager:4.9.2
     hostname: wazuh.manager
     restart: always
-    networks:
-      my-network:
-        ipv4_address: 192.168.1.100
     ulimits:
       memlock:
         soft: -1
@@ -49,9 +46,6 @@ services:
     image: wazuh/wazuh-indexer:4.9.2
     hostname: wazuh.indexer
     restart: always
-    networks:
-      my-network:
-        ipv4_address: 192.168.1.101
     ports:
       - "9200:9200"
     environment:
@@ -77,9 +71,6 @@ services:
     image: wazuh/wazuh-dashboard:4.9.2
     hostname: wazuh.dashboard
     restart: always
-    networks:
-      my-network:
-        ipv4_address: 192.168.1.102
     ports:
       - 443:5601
     environment:
@@ -107,28 +98,21 @@ services:
   attacker:
     build:
       context: ./attacker
-    networks:
-      my-network:
-        ipv4_address: 192.168.1.103
     tty: true
 
   target:
     build:
       context: ./target
-    networks:
-      my-network:
-        ipv4_address: 192.168.1.104
+    ports:
+      - "2222:22"
     volumes:
       - ./ssh-logs:/var/log
-    command: bash -c "sed -i '/imklog/s/^/#/' /etc/rsyslog.conf && rsyslogd && echo 'root:SecurePassword123' | chpasswd && sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && service ssh start && curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg && echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' | tee -a /etc/apt/sources.list.d/wazuh.list && apt update && WAZUH_MANAGER='192.168.1.100' apt install -y wazuh-agent && /var/ossec/bin/wazuh-control start && tail -f /dev/null"
+    command: bash -c "sed -i '/imklog/s/^/#/' /etc/rsyslog.conf && rsyslogd && echo 'root:SecurePassword123' | chpasswd && sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && service ssh start && curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg && echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' | tee -a /etc/apt/sources.list.d/wazuh.list && apt update && WAZUH_MANAGER='172.18.0.6' apt install -y wazuh-agent && /var/ossec/bin/wazuh-control start && tail -f /dev/null"
     tty: true
 
   crowdsec:
     image: crowdsecurity/crowdsec
     restart: always
-    networks:
-      my-network:
-        ipv4_address: 192.168.1.105
     environment:
       ## DOCKER_HOST: tcp://socket-proxy:2375
       COLLECTIONS: "crowdsecurity/sshd"
@@ -136,16 +120,10 @@ services:
       ## Bad pratice to mount docker socket into a container
       - /var/run/docker.sock:/var/run/docker.sock:ro
       ######################################################
-      - ./crowdsec:/etc/crowdsec/
+      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml
       - crowdsec-db:/var/lib/crowdsec/data/
       - crowdsec-config:/etc/crowdsec/
-
-networks:
-  my-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 192.168.1.0/24
+      - ./ssh-logs:/var/log/target
 
 volumes:
   ssh-logs:

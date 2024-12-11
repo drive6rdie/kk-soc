@@ -1,5 +1,4 @@
-source: docker
-container_name_regexp:
-  - .*target
+filenames:
+  - "/var/log/target/auth.log"
 labels:
   type: syslog
